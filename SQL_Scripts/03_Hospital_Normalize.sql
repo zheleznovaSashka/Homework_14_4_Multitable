@@ -1,14 +1,26 @@
 -- ============================================================
 -- БАЗА ДАННЫХ: Hospital (Больница)
--- ИСПРАВЛЕННАЯ ВЕРСИЯ
+-- С ПРОВЕРКОЙ НА СУЩЕСТВОВАНИЕ
 -- ============================================================
 
--- Переключаемся на базу данных Hospital
 USE Hospital;
 GO
 
 -- ============================================================
--- 1. СОЗДАНИЕ ТАБЛИЦ
+-- 1. УДАЛЕНИЕ СУЩЕСТВУЮЩИХ ТАБЛИЦ (если есть)
+-- ============================================================
+
+DROP TABLE IF EXISTS DoctorsExaminations;
+DROP TABLE IF EXISTS Donations;
+DROP TABLE IF EXISTS Wards;
+DROP TABLE IF EXISTS Examinations;
+DROP TABLE IF EXISTS Doctors;
+DROP TABLE IF EXISTS Sponsors;
+DROP TABLE IF EXISTS Departments;
+GO
+
+-- ============================================================
+-- 2. СОЗДАНИЕ ТАБЛИЦ
 -- ============================================================
 
 -- Таблица 1: Отделения (Departments)
@@ -65,7 +77,7 @@ CREATE TABLE Donations (
 );
 GO
 
--- Таблица 7: Врачи и обследования (DoctorsExaminations) - ИСПРАВЛЕНА
+-- Таблица 7: Врачи и обследования (DoctorsExaminations)
 CREATE TABLE DoctorsExaminations (
     Id INT IDENTITY(1,1) PRIMARY KEY,
     StartTime TIME NOT NULL,
@@ -82,7 +94,7 @@ CREATE TABLE DoctorsExaminations (
 GO
 
 -- ============================================================
--- 2. ЗАПОЛНЕНИЕ ТАБЛИЦ ТЕСТОВЫМИ ДАННЫМИ
+-- 3. ЗАПОЛНЕНИЕ ТАБЛИЦ ТЕСТОВЫМИ ДАННЫМИ
 -- ============================================================
 
 -- Отделения
@@ -153,7 +165,7 @@ INSERT INTO DoctorsExaminations (StartTime, EndTime, DoctorId, ExaminationId, Wa
 GO
 
 -- ============================================================
--- 3. ПРОВЕРКА ДАННЫХ (TOP 1000)
+-- 4. ПРОВЕРКА ДАННЫХ (TOP 1000)
 -- ============================================================
 
 SELECT TOP 1000 * FROM Departments;
@@ -166,11 +178,11 @@ SELECT TOP 1000 * FROM DoctorsExaminations;
 GO
 
 -- ============================================================
--- 4. ЗАПРОСЫ С ДВУМЯ И БОЛЕЕ ТАБЛИЦАМИ
+-- 5. ЗАПРОСЫ С ДВУМЯ И БОЛЕЕ ТАБЛИЦАМИ
 -- ============================================================
 
 -- Запрос 1: Информация о врачах и их обследованиях
-SELECT
+SELECT 
     d.Surname + ' ' + d.Name AS Врач,
     e.Name AS Обследование,
     de.StartTime AS Начало,
@@ -186,7 +198,7 @@ ORDER BY de.StartTime;
 GO
 
 -- Запрос 2: Количество обследований по врачам
-SELECT
+SELECT 
     d.Surname + ' ' + d.Name AS Врач,
     COUNT(de.Id) AS Количество_обследований
 FROM Doctors d
@@ -196,7 +208,7 @@ ORDER BY Количество_обследований DESC;
 GO
 
 -- Запрос 3: Пожертвования по отделениям
-SELECT
+SELECT 
     dep.Name AS Отделение,
     COUNT(don.Id) AS Количество_пожертвований,
     SUM(don.Amount) AS Общая_сумма
@@ -207,7 +219,7 @@ ORDER BY Общая_сумма DESC;
 GO
 
 -- Запрос 4: Спонсоры и их пожертвования
-SELECT
+SELECT 
     s.Name AS Спонсор,
     COUNT(don.Id) AS Количество_пожертвований,
     SUM(don.Amount) AS Общая_сумма,
@@ -219,7 +231,7 @@ ORDER BY Общая_сумма DESC;
 GO
 
 -- Запрос 5: Врачи с зарплатой выше средней
-SELECT
+SELECT 
     d.Surname + ' ' + d.Name AS Врач,
     d.Salary AS Зарплата
 FROM Doctors d
