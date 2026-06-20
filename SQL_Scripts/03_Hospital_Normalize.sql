@@ -1,131 +1,228 @@
 -- ============================================================
--- БАЗА ДАННЫХ: Hospital (Нормализация)
+-- БАЗА ДАННЫХ: Hospital (Больница)
+-- ИСПРАВЛЕННАЯ ВЕРСИЯ
 -- ============================================================
 
--- Предполагаемая структура Hospital:
--- Пациенты (ID, ФИО, Дата рождения, Пол, Телефон, Адрес, Диагноз, Врач, Отделение)
--- Врачи (ID, ФИО, Специализация, Отделение)
--- Отделения (ID, Название)
-
--- ============================================================
--- 1. СОЗДАНИЕ НОРМАЛИЗОВАННЫХ ТАБЛИЦ
--- ============================================================
-
--- Таблица "Отделения"
-CREATE TABLE Отделения (
-    ОтделениеID INT IDENTITY(1,1) PRIMARY KEY,
-    НазваниеОтделения NVARCHAR(100) NOT NULL UNIQUE,
-    Корпус INT
-);
-GO
-
--- Таблица "Врачи"
-CREATE TABLE Врачи (
-    ВрачID INT IDENTITY(1,1) PRIMARY KEY,
-    Фамилия NVARCHAR(50) NOT NULL,
-    Имя NVARCHAR(50) NOT NULL,
-    Отчество NVARCHAR(50) NULL,
-    Специализация NVARCHAR(100) NOT NULL,
-    ОтделениеID INT,
-    Телефон NVARCHAR(20),
-    CONSTRAINT FK_Врачи_Отделения FOREIGN KEY (ОтделениеID) REFERENCES Отделения(ОтделениеID)
-);
-GO
-
--- Таблица "Пациенты"
-CREATE TABLE Пациенты (
-    ПациентID INT IDENTITY(1,1) PRIMARY KEY,
-    Фамилия NVARCHAR(50) NOT NULL,
-    Имя NVARCHAR(50) NOT NULL,
-    Отчество NVARCHAR(50) NULL,
-    ДатаРождения DATE NOT NULL,
-    Пол NVARCHAR(10) CHECK (Пол IN ('М', 'Ж')),
-    Телефон NVARCHAR(20) NULL,
-    Адрес NVARCHAR(200) NULL,
-    ОтделениеID INT,
-    ЛечащийВрачID INT,
-    ДатаПоступления DATE NOT NULL,
-    ДатаВыписки DATE NULL,
-    CONSTRAINT FK_Пациенты_Отделения FOREIGN KEY (ОтделениеID) REFERENCES Отделения(ОтделениеID),
-    CONSTRAINT FK_Пациенты_Врачи FOREIGN KEY (ЛечащийВрачID) REFERENCES Врачи(ВрачID)
-);
-GO
-
--- Таблица "Диагнозы" (вынесены отдельно для 3НФ)
-CREATE TABLE Диагнозы (
-    ДиагнозID INT IDENTITY(1,1) PRIMARY KEY,
-    НазваниеДиагноза NVARCHAR(200) NOT NULL UNIQUE,
-    КодМКБ NVARCHAR(20)
-);
-GO
-
--- Таблица "Диагнозы_Пациентов" (связь многие-ко-многим)
-CREATE TABLE Диагнозы_Пациентов (
-    ПациентID INT NOT NULL,
-    ДиагнозID INT NOT NULL,
-    ДатаПостановки DATE NOT NULL,
-    PRIMARY KEY (ПациентID, ДиагнозID),
-    CONSTRAINT FK_Диагнозы_Пациентов_Пациенты FOREIGN KEY (ПациентID) REFERENCES Пациенты(ПациентID),
-    CONSTRAINT FK_Диагнозы_Пациентов_Диагнозы FOREIGN KEY (ДиагнозID) REFERENCES Диагнозы(ДиагнозID)
-);
+-- Переключаемся на базу данных Hospital
+USE Hospital;
 GO
 
 -- ============================================================
--- 2. ЗАПРОСЫ С ДВУМЯ И БОЛЕЕ ТАБЛИЦАМИ
+-- 1. СОЗДАНИЕ ТАБЛИЦ
 -- ============================================================
 
--- Запрос 1: Пациенты с их врачами и отделениями
-SELECT
-    p.Фамилия + ' ' + p.Имя AS Пациент,
-    v.Фамилия + ' ' + v.Имя AS Врач,
-    o.НазваниеОтделения AS Отделение,
-    p.ДатаПоступления
-FROM Пациенты p
-JOIN Врачи v ON p.ЛечащийВрачID = v.ВрачID
-JOIN Отделения o ON p.ОтделениеID = o.ОтделениеID
-ORDER BY p.ДатаПоступления DESC;
+-- Таблица 1: Отделения (Departments)
+CREATE TABLE Departments (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Building INT NOT NULL CHECK (Building BETWEEN 1 AND 5),
+    Name NVARCHAR(100) NOT NULL UNIQUE CHECK (Name <> '')
+);
 GO
 
--- Запрос 2: Количество пациентов по отделениям
-SELECT
-    o.НазваниеОтделения AS Отделение,
-    COUNT(*) AS Количество_пациентов
-FROM Пациенты p
-JOIN Отделения o ON p.ОтделениеID = o.ОтделениеID
-GROUP BY o.НазваниеОтделения
-ORDER BY Количество_пациентов DESC;
+-- Таблица 2: Врачи (Doctors)
+CREATE TABLE Doctors (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Surname NVARCHAR(50) NOT NULL CHECK (Surname <> ''),
+    Name NVARCHAR(50) NOT NULL CHECK (Name <> ''),
+    Salary MONEY NOT NULL CHECK (Salary > 0),
+    Premium MONEY NOT NULL CHECK (Premium >= 0) DEFAULT 0
+);
 GO
 
--- Запрос 3: Врачи с количеством пациентов
-SELECT
-    v.Фамилия + ' ' + v.Имя AS Врач,
-    v.Специализация,
-    COUNT(p.ПациентID) AS Количество_пациентов
-FROM Врачи v
-LEFT JOIN Пациенты p ON v.ВрачID = p.ЛечащийВрачID
-GROUP BY v.Фамилия, v.Имя, v.Специализация
-ORDER BY Количество_пациентов DESC;
+-- Таблица 3: Обследования (Examinations)
+CREATE TABLE Examinations (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Name NVARCHAR(100) NOT NULL UNIQUE CHECK (Name <> '')
+);
 GO
 
--- Запрос 4: Пациенты и их диагнозы
-SELECT
-    p.Фамилия + ' ' + p.Имя AS Пациент,
-    d.НазваниеДиагноза AS Диагноз,
-    dp.ДатаПостановки
-FROM Пациенты p
-JOIN Диагнозы_Пациентов dp ON p.ПациентID = dp.ПациентID
-JOIN Диагнозы d ON dp.ДиагнозID = d.ДиагнозID
-ORDER BY p.Фамилия;
+-- Таблица 4: Палаты (Wards)
+CREATE TABLE Wards (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Name NVARCHAR(20) NOT NULL UNIQUE CHECK (Name <> ''),
+    Places INT NOT NULL CHECK (Places >= 1),
+    DepartmentId INT NOT NULL,
+    CONSTRAINT FK_Wards_Departments FOREIGN KEY (DepartmentId) REFERENCES Departments(Id)
+);
 GO
 
--- Запрос 5: Пациенты старше 65 лет (пенсионеры)
+-- Таблица 5: Спонсоры (Sponsors)
+CREATE TABLE Sponsors (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Name NVARCHAR(100) NOT NULL UNIQUE CHECK (Name <> '')
+);
+GO
+
+-- Таблица 6: Пожертвования (Donations)
+CREATE TABLE Donations (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    Amount MONEY NOT NULL CHECK (Amount > 0),
+    Date DATE NOT NULL DEFAULT GETDATE() CHECK (Date <= GETDATE()),
+    DepartmentId INT NOT NULL,
+    SponsorId INT NOT NULL,
+    CONSTRAINT FK_Donations_Departments FOREIGN KEY (DepartmentId) REFERENCES Departments(Id),
+    CONSTRAINT FK_Donations_Sponsors FOREIGN KEY (SponsorId) REFERENCES Sponsors(Id)
+);
+GO
+
+-- Таблица 7: Врачи и обследования (DoctorsExaminations) - ИСПРАВЛЕНА
+CREATE TABLE DoctorsExaminations (
+    Id INT IDENTITY(1,1) PRIMARY KEY,
+    StartTime TIME NOT NULL,
+    EndTime TIME NOT NULL,
+    DoctorId INT NOT NULL,
+    ExaminationId INT NOT NULL,
+    WardId INT NOT NULL,
+    CONSTRAINT FK_DoctorsExaminations_Doctors FOREIGN KEY (DoctorId) REFERENCES Doctors(Id),
+    CONSTRAINT FK_DoctorsExaminations_Examinations FOREIGN KEY (ExaminationId) REFERENCES Examinations(Id),
+    CONSTRAINT FK_DoctorsExaminations_Wards FOREIGN KEY (WardId) REFERENCES Wards(Id),
+    CONSTRAINT CHK_StartTime CHECK (StartTime BETWEEN '08:00' AND '18:00'),
+    CONSTRAINT CHK_EndTime CHECK (EndTime > StartTime AND EndTime <= '18:00')
+);
+GO
+
+-- ============================================================
+-- 2. ЗАПОЛНЕНИЕ ТАБЛИЦ ТЕСТОВЫМИ ДАННЫМИ
+-- ============================================================
+
+-- Отделения
+INSERT INTO Departments (Building, Name) VALUES
+(1, 'Кардиология'),
+(1, 'Неврология'),
+(2, 'Терапия'),
+(2, 'Хирургия'),
+(3, 'Педиатрия');
+GO
+
+-- Врачи
+INSERT INTO Doctors (Surname, Name, Salary, Premium) VALUES
+('Иванов', 'Иван', 50000, 10000),
+('Петрова', 'Мария', 60000, 15000),
+('Сидоров', 'Петр', 45000, 5000),
+('Козлова', 'Анна', 70000, 20000),
+('Смирнов', 'Алексей', 55000, 8000);
+GO
+
+-- Обследования
+INSERT INTO Examinations (Name) VALUES
+('ЭКГ'),
+('МРТ'),
+('УЗИ'),
+('Анализ крови'),
+('Рентген');
+GO
+
+-- Палаты
+INSERT INTO Wards (Name, Places, DepartmentId) VALUES
+('101', 4, 1),
+('102', 2, 1),
+('201', 3, 2),
+('202', 4, 2),
+('301', 2, 3),
+('401', 4, 4),
+('501', 3, 5);
+GO
+
+-- Спонсоры
+INSERT INTO Sponsors (Name) VALUES
+('Фонд Здоровье'),
+('Медицинский центр'),
+('Благотворительный фонд'),
+('Корпорация Медика');
+GO
+
+-- Пожертвования
+INSERT INTO Donations (Amount, Date, DepartmentId, SponsorId) VALUES
+(10000, '2024-01-15', 1, 1),
+(25000, '2024-02-20', 2, 2),
+(15000, '2024-03-10', 3, 1),
+(30000, '2024-04-05', 4, 3),
+(20000, '2024-05-12', 5, 4),
+(5000, '2024-06-18', 1, 2);
+GO
+
+-- Врачи и обследования
+INSERT INTO DoctorsExaminations (StartTime, EndTime, DoctorId, ExaminationId, WardId) VALUES
+('09:00', '10:00', 1, 1, 1),
+('10:00', '11:30', 2, 2, 2),
+('11:00', '12:00', 3, 3, 3),
+('13:00', '14:30', 4, 4, 4),
+('14:00', '15:00', 5, 5, 5),
+('15:00', '16:00', 1, 2, 6),
+('16:00', '17:00', 2, 3, 7);
+GO
+
+-- ============================================================
+-- 3. ПРОВЕРКА ДАННЫХ (TOP 1000)
+-- ============================================================
+
+SELECT TOP 1000 * FROM Departments;
+SELECT TOP 1000 * FROM Doctors;
+SELECT TOP 1000 * FROM Examinations;
+SELECT TOP 1000 * FROM Wards;
+SELECT TOP 1000 * FROM Sponsors;
+SELECT TOP 1000 * FROM Donations;
+SELECT TOP 1000 * FROM DoctorsExaminations;
+GO
+
+-- ============================================================
+-- 4. ЗАПРОСЫ С ДВУМЯ И БОЛЕЕ ТАБЛИЦАМИ
+-- ============================================================
+
+-- Запрос 1: Информация о врачах и их обследованиях
 SELECT
-    p.Фамилия + ' ' + p.Имя AS Пациент,
-    p.ДатаРождения,
-    DATEDIFF(YEAR, p.ДатаРождения, GETDATE()) AS Возраст,
-    o.НазваниеОтделения AS Отделение
-FROM Пациенты p
-JOIN Отделения o ON p.ОтделениеID = o.ОтделениеID
-WHERE DATEDIFF(YEAR, p.ДатаРождения, GETDATE()) >= 65
-ORDER BY Возраст DESC;
+    d.Surname + ' ' + d.Name AS Врач,
+    e.Name AS Обследование,
+    de.StartTime AS Начало,
+    de.EndTime AS Конец,
+    w.Name AS Палата,
+    dep.Name AS Отделение
+FROM DoctorsExaminations de
+JOIN Doctors d ON de.DoctorId = d.Id
+JOIN Examinations e ON de.ExaminationId = e.Id
+JOIN Wards w ON de.WardId = w.Id
+JOIN Departments dep ON w.DepartmentId = dep.Id
+ORDER BY de.StartTime;
+GO
+
+-- Запрос 2: Количество обследований по врачам
+SELECT
+    d.Surname + ' ' + d.Name AS Врач,
+    COUNT(de.Id) AS Количество_обследований
+FROM Doctors d
+LEFT JOIN DoctorsExaminations de ON d.Id = de.DoctorId
+GROUP BY d.Surname, d.Name
+ORDER BY Количество_обследований DESC;
+GO
+
+-- Запрос 3: Пожертвования по отделениям
+SELECT
+    dep.Name AS Отделение,
+    COUNT(don.Id) AS Количество_пожертвований,
+    SUM(don.Amount) AS Общая_сумма
+FROM Donations don
+JOIN Departments dep ON don.DepartmentId = dep.Id
+GROUP BY dep.Name
+ORDER BY Общая_сумма DESC;
+GO
+
+-- Запрос 4: Спонсоры и их пожертвования
+SELECT
+    s.Name AS Спонсор,
+    COUNT(don.Id) AS Количество_пожертвований,
+    SUM(don.Amount) AS Общая_сумма,
+    AVG(don.Amount) AS Средняя_сумма
+FROM Sponsors s
+JOIN Donations don ON s.Id = don.SponsorId
+GROUP BY s.Name
+ORDER BY Общая_сумма DESC;
+GO
+
+-- Запрос 5: Врачи с зарплатой выше средней
+SELECT
+    d.Surname + ' ' + d.Name AS Врач,
+    d.Salary AS Зарплата
+FROM Doctors d
+WHERE d.Salary > (SELECT AVG(Salary) FROM Doctors)
+ORDER BY d.Salary DESC;
 GO
